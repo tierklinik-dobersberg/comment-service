@@ -14,14 +14,16 @@ import (
 
 func CommentsCommand(root *cli.Root) *cobra.Command {
 	var (
-		recurse bool
-		byScope bool
-		render  bool
+		recurse   bool
+		byScope   bool
+		render    bool
+		reference string
 	)
 
 	cmd := &cobra.Command{
-		Use:  "comments",
-		Args: cobra.ExactArgs(1),
+		Use:     "comments",
+		Aliases: []string{"comment"},
+		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cli := root.Comments()
 
@@ -30,6 +32,7 @@ func CommentsCommand(root *cli.Root) *cobra.Command {
 					Scope:      args[0],
 					Recurse:    recurse,
 					RenderHtml: render,
+					Reference:  reference,
 				}))
 				if err != nil {
 					logrus.Fatalf("failed to load comment: %s", err)
@@ -53,6 +56,7 @@ func CommentsCommand(root *cli.Root) *cobra.Command {
 	cmd.Flags().BoolVar(&recurse, "recurse", false, "Include all answers as well")
 	cmd.Flags().BoolVar(&render, "render-html", false, "Render comment content as HTML")
 	cmd.Flags().BoolVar(&byScope, "by-scope", false, "Get all answers by scope")
+	cmd.Flags().StringVar(&reference, "ref", "", "Filter comments by reference")
 
 	cmd.AddCommand(
 		CreateCommentCommand(root),
@@ -63,9 +67,10 @@ func CommentsCommand(root *cli.Root) *cobra.Command {
 
 func CreateCommentCommand(root *cli.Root) *cobra.Command {
 	var (
-		content string
-		parent  string
-		scope   string
+		content   string
+		parent    string
+		scope     string
+		reference string
 	)
 
 	cmd := &cobra.Command{
@@ -120,8 +125,11 @@ func CreateCommentCommand(root *cli.Root) *cobra.Command {
 					ParentId: parent,
 				}
 			} else {
-				req.Kind = &commentv1.CreateCommentRequest_Scope{
-					Scope: scope,
+				req.Kind = &commentv1.CreateCommentRequest_Root{
+					Root: &commentv1.RootComment{
+						Scope:     scope,
+						Reference: reference,
+					},
 				}
 			}
 
@@ -139,7 +147,11 @@ func CreateCommentCommand(root *cli.Root) *cobra.Command {
 		f.StringVar(&content, "content", "", "The content of the comment or the name of a file prefixed with @")
 		f.StringVar(&parent, "reply-to", "", "The ID of the comment to which this is a reply")
 		f.StringVar(&scope, "scope", "", "The ID of the scope")
+		f.StringVar(&reference, "ref", "", "An opaque application specific reference")
 	}
+
+	cmd.MarkFlagsMutuallyExclusive("scope", "reply-to")
+	_ = cmd.MarkFlagRequired("content")
 
 	return cmd
 }

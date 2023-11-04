@@ -27,6 +27,7 @@ type (
 
 	Comment struct {
 		Scope     string             `bson:"scopeId"`
+		Reference string             `bson:"ref"`
 		ID        primitive.ObjectID `bson:"_id"`
 		Content   string             `bson:"content"`
 		ParentID  primitive.ObjectID `bson:"parentId,omitempty"`
@@ -56,6 +57,7 @@ func (c Comment) ToProto() *commentv1.Comment {
 		Content:   c.Content,
 		CreatedAt: timestamppb.New(c.CreatedAt),
 		CreatorId: c.CreatorID,
+		Reference: c.Reference,
 	}
 
 	if !c.ParentID.IsZero() {

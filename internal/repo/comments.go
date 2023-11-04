@@ -141,21 +141,22 @@ func (r *Repository) GetCommentTreeFromCommentID(ctx context.Context, id string)
 	return result[0].buildCommentTree()
 }
 
-func (r *Repository) GetCommentTreeByScope(ctx context.Context, scopeId string) ([]*models.CommentTree, error) {
-	oid, err := primitive.ObjectIDFromHex(scopeId)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+func (r *Repository) GetCommentTreeByScope(ctx context.Context, scopeId string, reference string) ([]*models.CommentTree, error) {
+	filter := bson.M{
+		"scopeId": scopeId,
+		"parentId": bson.M{
+			"$exists": false,
+		},
+	}
+
+	if reference != "" {
+		filter["ref"] = reference
 	}
 
 	pipeline := mongo.Pipeline{
 		{{
-			Key: "$match",
-			Value: bson.M{
-				"scopeId": oid,
-				"parentId": bson.M{
-					"$exists": false,
-				},
-			},
+			Key:   "$match",
+			Value: filter,
 		}},
 		graphLookupStep,
 	}
