@@ -48,6 +48,11 @@ func (svc *Service) CreateScope(ctx context.Context, req *connect.Request[commen
 		CommentViewURLTemplate: req.Msg.ViewCommentUrlTemplate,
 	}
 
+	uniqueOwnerIds := data.IndexSlice(req.Msg.ScopeOwnerIds, func(owner string) string {
+		return owner
+	})
+	scopeModel.OwnerIDs = data.MapToSlice(uniqueOwnerIds)
+
 	_, err := svc.Repository.CreateScope(ctx, scopeModel)
 	if err != nil {
 		return nil, err
@@ -60,6 +65,68 @@ func (svc *Service) CreateScope(ctx context.Context, req *connect.Request[commen
 
 	return connect.NewResponse(&commentv1.CreateScopeResponse{
 		Scope: scope.ToProto(),
+	}), nil
+}
+
+func (svc *Service) UpdateScope(ctx context.Context, req *connect.Request[commentv1.UpdateScopeRequest]) (*connect.Response[commentv1.UpdateScopeResponse], error) {
+	scopeModel, err := svc.Repository.GetScopeByID(ctx, req.Msg.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	paths := []string{
+		"name",
+		"notification_type",
+		"view_comment_url_template",
+		"add_scope_owner_ids",
+		"remove_scope_owner_ids",
+	}
+
+	if fm := req.Msg.GetWriteMask(); fm != nil && len(fm.Paths) > 0 {
+		paths = fm.Paths
+	}
+
+	for _, p := range paths {
+		switch p {
+		case "name":
+			scopeModel.Name = req.Msg.Name
+		case "notification_type":
+			scopeModel.NotificationType = models.NotifcationTypeFromProto(req.Msg.NotifcationType)
+		case "view_comment_url_template":
+			scopeModel.CommentViewURLTemplate = req.Msg.ViewCommentUrlTemplate
+		case "add_scope_owner_ids":
+			scopeModel.OwnerIDs = append(scopeModel.OwnerIDs, req.Msg.AddScopeOwnerIds...)
+		case "remove_scope_owner_ids":
+			lm := data.IndexSlice(req.Msg.RemoveScopeOwnerIds, func(s string) string { return s })
+
+			update := make([]string, 0, len(scopeModel.OwnerIDs))
+
+			for _, id := range scopeModel.OwnerIDs {
+				if _, ok := lm[id]; ok {
+					continue
+				}
+
+				update = append(update, id)
+			}
+
+			scopeModel.OwnerIDs = update
+
+		default:
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid field path: %q", p))
+		}
+	}
+
+	uniqueOwnerIds := data.IndexSlice(scopeModel.OwnerIDs, func(owner string) string {
+		return owner
+	})
+	scopeModel.OwnerIDs = data.MapToSlice(uniqueOwnerIds)
+
+	if err := svc.Repository.UpdateScope(ctx, scopeModel.ID, &scopeModel); err != nil {
+		return nil, err
+	}
+
+	return connect.NewResponse(&commentv1.UpdateScopeResponse{
+		Scope: scopeModel.ToProto(),
 	}), nil
 }
 
@@ -334,7 +401,23 @@ func (svc *Service) sendNotifications(comment models.Comment) {
 	}))
 	if err != nil {
 		log.L(ctx).Errorf("failed to load comment creator profile %q: %s", comment.CreatorID, err)
+
 		return
+	}
+
+	// build a user-"notification reason" map indexed by user id
+	userMap := make(map[string]string /* reason: mention/parent */)
+
+	// load the scope and add all owners to the userMap
+	scope, err := svc.Repository.GetScopeByID(ctx, comment.Scope)
+	if err != nil {
+		log.L(ctx).Errorf("failed to load scope %q: %s", comment.Scope, err)
+
+		return
+	}
+
+	for _, ownerId := range scope.OwnerIDs {
+		userMap[ownerId] = "owner"
 	}
 
 	// find all parent comments so we know which users to notify
@@ -345,8 +428,6 @@ func (svc *Service) sendNotifications(comment models.Comment) {
 		return
 	}
 
-	// build a user-"notification reason" map indexed by user id
-	userMap := make(map[string]string /* reason: mention/parent */)
 	for _, pc := range parentComments {
 		// those users are notified because the created/answered at a parent comment
 		userMap[pc.CreatorID] = "parent"
@@ -380,10 +461,19 @@ func (svc *Service) sendNotifications(comment models.Comment) {
 			continue
 		}
 
-		subject := creatorDisplayName + " hat auf deinen Kommentar geantwortet"
-
-		if reason == "mention" {
+		subject := ""
+		switch reason {
+		case "owner":
+			subject = creatorDisplayName + " hat einen neuen Kommentar in " + scope.Name + " erstellt"
+		case "mention":
 			subject = creatorDisplayName + " hat dich in einem Kommentar erwähnt"
+		case "parent":
+			subject = creatorDisplayName + " hat auf deinen Kommentar geantwortet"
+
+		default:
+			log.L(ctx).Errorf("unsupported notification reason %q", reason)
+
+			continue
 		}
 
 		// FIXME(ppacher): render a nice e-mail template here

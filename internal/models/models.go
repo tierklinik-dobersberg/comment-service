@@ -23,6 +23,7 @@ type (
 		Name                   string             `bson:"name"`
 		NotificationType       NotificationType   `bson:"notificationType"`
 		CommentViewURLTemplate string             `bson:"viewUrlTemplate"`
+		OwnerIDs               []string           `bson:"scopeOwnerIds"`
 	}
 
 	Comment struct {
@@ -47,6 +48,7 @@ func (s Scope) ToProto() *commentv1.Scope {
 		Name:                   s.Name,
 		NotifcationType:        NotificationTypeToProto(s.NotificationType),
 		ViewCommentUrlTemplate: s.CommentViewURLTemplate,
+		ScopeOwnerIds:          s.OwnerIDs,
 	}
 }
 
