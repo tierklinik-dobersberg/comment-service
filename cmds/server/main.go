@@ -10,6 +10,8 @@ import (
 	"github.com/tierklinik-dobersberg/apis/gen/go/tkd/comment/v1/commentv1connect"
 	"github.com/tierklinik-dobersberg/apis/pkg/auth"
 	"github.com/tierklinik-dobersberg/apis/pkg/cors"
+	"github.com/tierklinik-dobersberg/apis/pkg/discovery/consuldiscover"
+	"github.com/tierklinik-dobersberg/apis/pkg/discovery/wellknown"
 	"github.com/tierklinik-dobersberg/apis/pkg/log"
 	"github.com/tierklinik-dobersberg/apis/pkg/server"
 	"github.com/tierklinik-dobersberg/apis/pkg/validator"
@@ -69,6 +71,16 @@ func main() {
 
 	path, handler := commentv1connect.NewCommentServiceHandler(svc, interceptors)
 	serveMux.Handle(path, handler)
+
+	// Register at service catalog
+	catalog, err := consuldiscover.NewFromEnv()
+	if err != nil {
+		logger.Fatalf("failed to get service catalog client: %s", err)
+	}
+
+	if err := wellknown.CommentService.Register(ctx, catalog, cfg.AdminListenAddress); err != nil {
+		logger.Errorf("failed to register comment service at service catalog: %s", err)
+	}
 
 	// Create the server
 	srv := server.Create(cfg.PublicListenAddress, cors.Wrap(corsConfig, serveMux))
