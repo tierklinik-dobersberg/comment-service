@@ -1,8 +1,6 @@
 module github.com/tierklinik-dobersberg/comment-service
 
-go 1.22.0
-
-toolchain go1.23.0
+go 1.23.0
 
 require (
 	github.com/bufbuild/connect-go v1.10.0
@@ -48,6 +46,7 @@ require (
 	github.com/sebest/xff v0.0.0-20210106013422-671bd2870b3a // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
