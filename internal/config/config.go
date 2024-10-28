@@ -18,7 +18,6 @@ type Config struct {
 	Database            string   `env:"DATABASE" json:"database"`
 	AllowedOrigins      []string `env:"ALLOWED_ORIGINS" json:"allowedOrigins"`
 	PublicListenAddress string   `env:"PUBLIC_LISTEN" json:"publicListen"`
-	AdminListenAddress  string   `env:"ADMIN_LISTEN" json:"adminListen"`
 }
 
 func LoadConfig(ctx context.Context, path string) (*Config, error) {

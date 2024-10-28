@@ -81,7 +81,7 @@ func main() {
 
 	if err := discovery.Register(ctx, catalog, &discovery.ServiceInstance{
 		Name:    wellknown.CommentV1ServiceScope,
-		Address: cfg.AdminListenAddress,
+		Address: cfg.PublicListenAddress,
 	}); err != nil {
 		logger.Errorf("failed to register comment service at service catalog: %s", err)
 	}
